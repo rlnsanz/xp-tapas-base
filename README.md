@@ -1,1 +1,1 @@
-# xp-resnet152
+# xp-tapas

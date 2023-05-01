@@ -1,4 +1,4 @@
-from .utils import parse_question
+from utils import parse_question
 from transformers import TapasConfig, TapasForQuestionAnswering, TapasTokenizer
 
 # or, the base sized model with WTQ configuration

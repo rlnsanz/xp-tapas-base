@@ -1,8 +1,10 @@
 import os
 import shutil
-from pathlib import Path
+from pathlib import Path, PurePath
 import pandas as pd
 from tqdm import tqdm
+import json
+import cloudpickle
 
 from utils import parse_question
 from transformers import TapasConfig, TapasForQuestionAnswering, TapasTokenizer
@@ -13,6 +15,14 @@ from torch.utils import data as torchdata
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+names = [
+    "queries",
+    "answer_coordinates",
+    "answer_text",
+    "float_values",
+    "aggregation_functions",
+]
+
 data = {}
 queries = {}
 answer_coordinates = {}
@@ -21,32 +31,46 @@ answer_text = {}
 float_values = {}
 aggregation_functions = {}
 
-for _, ut, ct, tv in tqdm(
-    pd.read_csv("data/training.tsv", sep="\t", index_col=0).itertuples()
-):
-    try:
-        parsed = parse_question(
-            table=pd.read_csv(ct).astype(str), question=ut, answer_texts=tv.split("|")
-        )
-    except Exception as e:
-        # print(e, "::", ut, ct, tv)
-        continue
+checkpoints = Path("checkpoints")
 
-    q, ans_txt, ans_coord, float_value, aggregation_function = parsed  # type: ignore
+if checkpoints.exists():
+    for name in names:
+        with open(checkpoints / PurePath(name).with_suffix(".pkl"), "rb") as f:
+            locals()[name].update(cloudpickle.load(f))  # type: ignore
+else:
+    checkpoints.mkdir()
+    for _, ut, ct, tv in tqdm(
+        pd.read_csv("data/training.tsv", sep="\t", index_col=0).itertuples()
+    ):
+        try:
+            parsed = parse_question(
+                table=pd.read_csv(ct).astype(str),
+                question=ut,
+                answer_texts=tv.split("|"),
+            )
+        except Exception as e:
+            # print(e, "::", ut, ct, tv)
+            continue
 
-    if ct not in data:
-        data[ct] = pd.read_csv(ct).astype(str)
-        queries[ct] = []
-        answer_coordinates[ct] = []
-        answer_text[ct] = []
-        float_values[ct] = []
-        aggregation_functions[ct] = []
+        q, ans_txt, ans_coord, float_value, aggregation_function = parsed  # type: ignore
 
-    queries[ct].append(q)
-    answer_coordinates[ct].append(ans_coord)
-    answer_text[ct].append(ans_txt)
-    float_values[ct].append(float_value)
-    aggregation_functions[ct].append(aggregation_function)
+        if ct not in data:
+            data[ct] = pd.read_csv(ct).astype(str)
+            queries[ct] = []
+            answer_coordinates[ct] = []
+            answer_text[ct] = []
+            float_values[ct] = []
+            aggregation_functions[ct] = []
+
+        queries[ct].append(q)
+        answer_coordinates[ct].append(ans_coord)
+        answer_text[ct].append(ans_txt)
+        float_values[ct].append(float_value)
+        aggregation_functions[ct].append(aggregation_function)
+
+    for name in names:
+        with open(checkpoints / PurePath(name).with_suffix(".pkl"), "wb") as f:
+            cloudpickle.dump(locals()[name], f)
 
 
 class TableDataset(torchdata.Dataset):

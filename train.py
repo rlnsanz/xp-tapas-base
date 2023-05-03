@@ -12,6 +12,8 @@ from transformers import TapasConfig, TapasForQuestionAnswering, TapasTokenizer
 import torch
 from torch.utils import data as torchdata
 
+import flor
+from flor import MTK as Flor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -72,44 +74,6 @@ else:
         with open(checkpoints / PurePath(name).with_suffix(".pkl"), "wb") as f:
             cloudpickle.dump(locals()[name], f)
 
-
-class TableDataset(torchdata.Dataset):
-    def __init__(
-        self,
-        tokenizer,
-        data,
-        queries,
-        answer_coordinates,
-        answer_text,
-        float_values,
-    ):
-        self.data = data
-        self.tokenizer = tokenizer
-        self.queries = queries
-        self.answer_coordinates = answer_coordinates
-        self.answer_text = answer_text
-        self.float_values = float_values
-
-    def __getitem__(self, idx):
-        encoding = self.tokenizer(
-            table=self.data.iloc[idx],
-            queries=self.queries.iloc[idx],
-            answer_coordinates=self.answer_coordinates.iloc[idx],
-            answer_text=self.answer_text.iloc[idx],
-            truncation=True,
-            padding="max_length",
-            return_tensors="pt",
-        )
-        # remove the batch dimension which the tokenizer adds by default
-        encoding = {key: val.squeeze(0) for key, val in encoding.items()}
-        # add the float_answer which is also required (weak supervision for aggregation case)
-        encoding["float_answer"] = torch.tensor([float(r) for r in self.float_values])
-        return encoding
-
-    def __len__(self):
-        return len(self.data)
-
-
 # or, the base sized model with WTQ configuration
 model_name = "google/tapas-base-finetuned-wtq"
 config = TapasConfig.from_pretrained(model_name)
@@ -118,8 +82,82 @@ model = TapasForQuestionAnswering.from_pretrained("google/tapas-base", config=co
 assert isinstance(model, TapasForQuestionAnswering)
 model = model.to(device)
 
-tr_dataset = TableDataset(
-    tokenizer, data, queries, answer_coordinates, answer_text, float_values
-)
 
-print("almost!")
+class TableDataset(torchdata.Dataset):
+    def __init__(
+        self,
+        tokenizer=tokenizer,
+        queries=queries,
+        answer_coordinates=answer_coordinates,
+        answer_text=answer_text,
+        float_values=float_values,
+    ):
+        self.tokenizer = tokenizer
+        self.queries = queries
+        self.answer_coordinates = answer_coordinates
+        self.answer_text = answer_text
+        self.float_values = float_values
+
+        self.locs = [k for k in queries.keys()]
+
+    def __getitem__(self, idx):
+        q = self.locs[idx]
+
+        table = pd.read_csv(q).astype(str)
+        queries = self.queries[q]
+        answer_text = self.answer_text[q]
+        float_values = [float(v) if v else float("nan") for v in self.float_values[q]]
+        answer_coordinates = [c if c else [] for c in self.answer_coordinates[q]]
+
+        encoding = self.tokenizer(
+            table=table,
+            queries=queries,
+            answer_coordinates=answer_coordinates,
+            answer_text=answer_text,
+            truncation=True,
+            padding="max_length",
+            return_tensors="pt",
+        )
+        # remove the batch dimension which the tokenizer adds by default
+        encoding = {key: val.squeeze(0) for key, val in encoding.items()}
+
+        # add the float_answer which is also required (weak supervision for aggregation case)
+        encoding["float_answer"] = torch.tensor(float_values)
+
+        return encoding
+
+    def __len__(self):
+        return len(self.locs)
+
+
+tr_dataset = TableDataset()
+train_dataloader = torchdata.DataLoader(tr_dataset, batch_size=None, shuffle=True)
+
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5, weight_decay=1e-4)
+
+Flor.checkpoints(model, optimizer)
+num_steps = len(train_dataloader)
+for epoch in Flor.loop(range(3)):
+    model.train()
+    for i, batch in Flor.loop(enumerate(train_dataloader)):
+        for k in batch:
+            batch[k] = batch[k].to(device)
+        if len(batch["labels"].shape) < 2:
+            for k in batch:
+                batch[k] = batch[k].unsqueeze(0)
+        outputs = model(**batch)
+        loss = outputs.loss
+
+        if loss.item() > 5:
+            continue
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        print(epoch + 1, f"({i + 1} / {num_steps})", flor.log("loss", loss.item()))
+
+        if i >= 50:
+            break
+
+print("All done!")

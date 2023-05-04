@@ -130,8 +130,29 @@ class TableDataset(torchdata.Dataset):
         return len(self.locs)
 
 
+def collate_fn(batch):
+    """
+    Unsequeeze
+    device
+    """
+
+    for item in batch:
+        if len(item["labels"].shape) < 2:
+            for k in item:
+                if k == "float_answer":
+                    continue
+                item[k] = item[k].unsqueeze(0)
+
+    new_dict = {}
+    for k in batch[0].keys():
+        new_dict[k] = torch.cat([item[k] for item in batch], dim=0).to(device)
+    return new_dict
+
+
 tr_dataset = TableDataset()
-train_dataloader = torchdata.DataLoader(tr_dataset, batch_size=None, shuffle=True)
+train_dataloader = torchdata.DataLoader(
+    tr_dataset, batch_size=2, shuffle=True, collate_fn=collate_fn
+)
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5, weight_decay=1e-4)
 
@@ -140,24 +161,25 @@ num_steps = len(train_dataloader)
 for epoch in Flor.loop(range(3)):
     model.train()
     for i, batch in Flor.loop(enumerate(train_dataloader)):
-        for k in batch:
-            batch[k] = batch[k].to(device)
-        if len(batch["labels"].shape) < 2:
-            for k in batch:
-                batch[k] = batch[k].unsqueeze(0)
         outputs = model(**batch)
         loss = outputs.loss
 
         if loss.item() > 5:
+            for k in batch:
+                batch[k].detach()
             continue
 
-        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        optimizer.zero_grad()
 
         print(epoch + 1, f"({i + 1} / {num_steps})", flor.log("loss", loss.item()))
 
+        for k in batch:
+            batch[k].detach()
+        loss.detach()
         if i >= 50:
             break
+    torch.cuda.empty_cache()
 
 print("All done!")

@@ -161,17 +161,18 @@ num_steps = len(train_dataloader)
 for epoch in Flor.loop(range(3)):
     model.train()
     for i, batch in Flor.loop(enumerate(train_dataloader)):
+        optimizer.zero_grad()
+
         outputs = model(**batch)
         loss = outputs.loss
 
-        if loss.item() > 5:
-            for k in batch:
-                batch[k].detach()
-            continue
+        # if loss.item() > 25:
+        #     for k in batch:
+        #         batch[k].detach()
+        #     continue
 
         loss.backward()
         optimizer.step()
-        optimizer.zero_grad()
 
         print(epoch + 1, f"({i + 1} / {num_steps})", flor.log("loss", loss.item()))
 

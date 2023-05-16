@@ -14,6 +14,7 @@ from torch.utils import data as torchdata
 
 import flor
 from flor import MTK as Flor
+from datasets import load_metric
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -149,16 +150,22 @@ def collate_fn(batch):
     return new_dict
 
 
-tr_dataset = TableDataset()
+full_dataset = TableDataset()
+train_size = int(0.8 * full_dataset.__len__())
+test_size = full_dataset.__len__() - train_size
+train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])
 train_dataloader = torchdata.DataLoader(
-    tr_dataset, batch_size=2, shuffle=True, collate_fn=collate_fn
+    train_dataset, batch_size=2, shuffle=True, collate_fn=collate_fn
+)
+test_dataloader = torchdata.DataLoader(
+    test_dataset, batch_size=2, shuffle=False, collate_fn=collate_fn
 )
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5, weight_decay=1e-4)
 
 Flor.checkpoints(model, optimizer)
 num_steps = len(train_dataloader)
-for epoch in Flor.loop(range(3)):
+for epoch in Flor.loop(range(0)):
     model.train()
     for i, batch in Flor.loop(enumerate(train_dataloader)):
         optimizer.zero_grad()
@@ -184,3 +191,13 @@ for epoch in Flor.loop(range(3)):
     torch.cuda.empty_cache()
 
 print("All done!")
+
+print("TEST MODEL")
+model.eval()
+with torch.no_grad():
+    accuracy = load_metric("accuracy")
+    for i, batch in Flor.loop(enumerate(test_dataloader)):
+        labels = batch["labels"]
+        print(labels)
+        outputs = model(**batch)
+        print(outputs.logits)

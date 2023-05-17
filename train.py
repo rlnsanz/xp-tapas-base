@@ -5,6 +5,7 @@ import pandas as pd
 from tqdm import tqdm
 import json
 import cloudpickle
+import evaluate
 
 from utils import parse_question
 from transformers import TapasConfig, TapasForQuestionAnswering, TapasTokenizer
@@ -153,7 +154,7 @@ def collate_fn(batch):
 full_dataset = TableDataset()
 train_size = int(0.8 * full_dataset.__len__())
 test_size = full_dataset.__len__() - train_size
-train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])
+train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])  # type: ignore
 train_dataloader = torchdata.DataLoader(
     train_dataset, batch_size=2, shuffle=True, collate_fn=collate_fn
 )
@@ -195,7 +196,7 @@ print("All done!")
 print("TEST MODEL")
 model.eval()
 with torch.no_grad():
-    accuracy = load_metric("accuracy")
+    accuracy = evaluate.load("accuracy")
     for i, batch in Flor.loop(enumerate(test_dataloader)):
         labels = batch["labels"]
         print(labels)

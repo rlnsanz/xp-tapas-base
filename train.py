@@ -162,11 +162,15 @@ test_dataloader = torchdata.DataLoader(
     test_dataset, batch_size=2, shuffle=False, collate_fn=collate_fn
 )
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5, weight_decay=1e-4)
+optimizer = torch.optim.AdamW(
+    model.parameters(),
+    lr=flor.arg("lr", 1e-5),
+    weight_decay=flor.arg("weight_decay", 1e-4),
+)
 
 Flor.checkpoints(model, optimizer)
 num_steps = len(train_dataloader)
-for epoch in Flor.loop(range(0)):
+for epoch in Flor.loop(range(flor.arg("epochs", 5))):
     model.train()
     for i, batch in Flor.loop(enumerate(train_dataloader)):
         optimizer.zero_grad()

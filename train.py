@@ -158,7 +158,7 @@ def collate_fn(batch):
 
 tr_dataset = TableDataset()
 train_dataloader = torchdata.DataLoader(
-    tr_dataset, batch_size=2, shuffle=True, collate_fn=collate_fn
+    tr_dataset, batch_size=flor.arg('batch_size', 2), shuffle=True, collate_fn=collate_fn
 )
 
 optimizer = torch.optim.AdamW(
@@ -190,7 +190,7 @@ for epoch in Flor.loop(range(flor.arg('epochs', 3))):
         for k in batch:
             batch[k].detach()
         loss.detach()
-        if i >= 50:
+        if i >= flor.arg('step_cap', 200):
             break
     torch.cuda.empty_cache()
 

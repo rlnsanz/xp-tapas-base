@@ -7,7 +7,7 @@ import json
 import cloudpickle
 
 from utils import parse_question
-from transformers import TapasConfig, TapasForQuestionAnswering, TapasTokenizer
+from transformers import TapasConfig, TapasForQuestionAnswering, TapasTokenizer # type: ignore
 
 import torch
 from torch.utils import data as torchdata

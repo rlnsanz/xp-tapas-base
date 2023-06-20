@@ -1,12 +1,12 @@
 {
     "NAME": "BATCH",
-    "TSTAMP": "2023-06-20T17:52:03.json",
+    "TSTAMP": "2023-06-20T18:03:21.json",
     "PROJID": "xp-tapas-base_flor.shadow.sigmod",
-    "EPOCHS": 3,
+    "EPOCHS": 1,
     "CLI": {
         "epochs": "5",
         "lr": "0.0007780000000000002",
         "weight_decay": "0.0001",
-        "batch_size": "2"
+        "batch_size": "4"
     }
 }

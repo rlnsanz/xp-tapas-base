@@ -109,20 +109,27 @@ class TableDataset(torchdata.Dataset):
         float_values = [float(v) if v else float("nan") for v in self.float_values[q]]
         answer_coordinates = [c if c else [] for c in self.answer_coordinates[q]]
 
-        encoding = self.tokenizer(
-            table=table,
-            queries=queries,
-            answer_coordinates=answer_coordinates,
-            answer_text=answer_text,
-            truncation=True,
-            padding="max_length",
-            return_tensors="pt",
-        )
+        try:
+            encoding = self.tokenizer(
+                table=table,
+                queries=queries,
+                answer_coordinates=answer_coordinates,
+                answer_text=answer_text,
+                truncation=True,
+                padding="max_length",
+                return_tensors="pt",
+            )
+        except:
+            print("Catch")
+            return self.last_valid_encoding
+
         # remove the batch dimension which the tokenizer adds by default
         encoding = {key: val.squeeze(0) for key, val in encoding.items()}
 
         # add the float_answer which is also required (weak supervision for aggregation case)
         encoding["float_answer"] = torch.tensor(float_values)
+
+        self.last_valid_encoding = encoding
 
         return encoding
 

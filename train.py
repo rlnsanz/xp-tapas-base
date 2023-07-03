@@ -7,7 +7,7 @@ import json
 import cloudpickle
 
 from utils import parse_question
-from transformers import TapasConfig, TapasForQuestionAnswering, TapasTokenizer # type: ignore
+from transformers import TapasConfig, TapasForQuestionAnswering, TapasTokenizer  # type: ignore
 
 import torch
 from torch.utils import data as torchdata
@@ -158,7 +158,10 @@ def collate_fn(batch):
 
 tr_dataset = TableDataset()
 train_dataloader = torchdata.DataLoader(
-    tr_dataset, batch_size=flor.arg('batch_size', 2), shuffle=True, collate_fn=collate_fn
+    tr_dataset,
+    batch_size=flor.arg("batch_size", 2),
+    shuffle=True,
+    collate_fn=collate_fn,
 )
 
 optimizer = torch.optim.AdamW(
@@ -169,7 +172,7 @@ optimizer = torch.optim.AdamW(
 
 Flor.checkpoints(model, optimizer)
 num_steps = len(train_dataloader)
-for epoch in Flor.loop(range(flor.arg('epochs', 3))):
+for epoch in Flor.loop(range(flor.arg("epochs", 3))):
     model.train()
     for i, batch in Flor.loop(enumerate(train_dataloader)):
         optimizer.zero_grad()
@@ -190,8 +193,9 @@ for epoch in Flor.loop(range(flor.arg('epochs', 3))):
         for k in batch:
             batch[k].detach()
         loss.detach()
-        if i >= flor.arg('step_cap', 200):
+        if i >= flor.arg("step_cap", 200):
             break
     torch.cuda.empty_cache()
+    flor.log("dp", epoch)
 
 print("All done!")

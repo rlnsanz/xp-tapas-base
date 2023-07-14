@@ -17,7 +17,7 @@ import flor
 from flor import MTK as Flor
 from datasets import load_metric
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device(flor.arg("device", "cuda" if torch.cuda.is_available() else "cpu"))
 
 names = [
     "queries",
